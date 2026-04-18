@@ -126,6 +126,25 @@ button.secondary {
   box-shadow: 6px 6px 0px rgba(0,0,0,0.1);
   transform: rotate(-1deg);
   transition: all 0.2s;
+  position: relative;
+}
+
+.group-card-delete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  min-width: 0;
+}
+
+.group-card-delete svg {
+  display: block;
 }
 
 .group-card:hover {
@@ -139,20 +158,33 @@ button.secondary {
   color: #d32f2f;
   font-family: 'Caveat', 'Mynerve', cursive;
   word-wrap: break-word;
+  padding-right: 44px;
 }
 
 .group-card-actions {
   display: flex;
+  flex-direction: column;
   gap: 10px;
   margin-top: 15px;
-  flex-wrap: wrap;
+}
+
+.group-card-row {
+  display: flex;
+  gap: 10px;
 }
 
 .group-card-actions button {
-  flex: 1;
-  min-width: 80px;
   padding: 8px 15px;
   font-size: 0.9em;
+}
+
+.group-card-row button {
+  flex: 1;
+  min-width: 80px;
+}
+
+.group-card-play {
+  width: 100%;
 }
 
 /* Forms */
