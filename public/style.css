@@ -11,6 +11,7 @@ body {
   min-height: 100vh;
   padding: 20px;
   color: #333;
+  font-size: 18px;
 }
 
 #app {
@@ -446,6 +447,10 @@ textarea:focus {
 
 /* Responsive */
 @media (max-width: 768px) {
+  body {
+    font-size: 16px;
+  }
+
   h1 {
     font-size: 2em;
   }
