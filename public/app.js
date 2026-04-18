@@ -1,5 +1,3 @@
-const API_BASE = '/api';
-
 // App state
 let currentScreen = 'home';
 let groups = [];
@@ -309,19 +307,27 @@ function renderGameScreen() {
 
 // --- API Functions ---
 
+function friendlyError(err) {
+  const raw = (err && err.message) || String(err);
+  if (/invalid password/i.test(raw)) return 'That password is not correct.';
+  if (/group not found/i.test(raw)) return 'Group not found.';
+  if (/name required/i.test(raw)) return 'Please enter a name.';
+  if (/password required/i.test(raw)) return 'Please enter a password.';
+  return raw;
+}
+
 async function loadGroups() {
   try {
-    const response = await fetch(`${API_BASE}/groups`);
-    groups = await response.json();
+    groups = await db.listGroups();
     render();
   } catch (err) {
     console.error('Error loading groups:', err);
-    showAlert('Failed to load groups', { title: 'Oops' });
+    await showAlert(friendlyError(err), { title: 'Could not load groups' });
   }
 }
 
 async function createGroup() {
-  const name = document.getElementById('groupName').value;
+  const name = document.getElementById('groupName').value.trim();
   const password = document.getElementById('groupPassword').value;
 
   if (!name || !password) {
@@ -334,12 +340,9 @@ async function createGroup() {
   const words = [];
 
   for (let i = 0; i < greekInputs.length; i++) {
-    if (greekInputs[i].value && englishInputs[i].value) {
-      words.push({
-        greek: greekInputs[i].value,
-        english: englishInputs[i].value
-      });
-    }
+    const g = greekInputs[i].value.trim();
+    const e = englishInputs[i].value.trim();
+    if (g && e) words.push({ greek: g, english: e });
   }
 
   if (words.length < 2) {
@@ -348,23 +351,13 @@ async function createGroup() {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/groups`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, password, words })
-    });
-
-    if (response.ok) {
-      await showAlert('Group created!', { title: 'Done' });
-      switchScreen('home');
-      loadGroups();
-    } else {
-      const err = await response.json().catch(() => ({}));
-      await showAlert(err.error || `HTTP ${response.status}`, { title: 'Could not create group' });
-    }
+    await db.createGroup({ name, password, words });
+    await showAlert('Group created!', { title: 'Done' });
+    switchScreen('home');
+    loadGroups();
   } catch (err) {
     console.error('Error creating group:', err);
-    await showAlert('Could not reach the server. Details: ' + err.message, { title: 'Network error' });
+    await showAlert(friendlyError(err), { title: 'Could not create group' });
   }
 }
 
@@ -375,19 +368,16 @@ async function updateGroup() {
     return;
   }
 
-  const name = document.getElementById('editGroupName').value;
+  const name = document.getElementById('editGroupName').value.trim();
 
   const greekInputs = document.querySelectorAll('.greek-word');
   const englishInputs = document.querySelectorAll('.english-word');
   const words = [];
 
   for (let i = 0; i < greekInputs.length; i++) {
-    if (greekInputs[i].value && englishInputs[i].value) {
-      words.push({
-        greek: greekInputs[i].value,
-        english: englishInputs[i].value
-      });
-    }
+    const g = greekInputs[i].value.trim();
+    const e = englishInputs[i].value.trim();
+    if (g && e) words.push({ greek: g, english: e });
   }
 
   if (words.length < 2) {
@@ -396,23 +386,13 @@ async function updateGroup() {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/groups/${currentGroup.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: editPassword, name, words })
-    });
-
-    if (response.ok) {
-      await showAlert('Group updated!', { title: 'Saved' });
-      switchScreen('home');
-      loadGroups();
-    } else {
-      const error = await response.json().catch(() => ({}));
-      await showAlert(error.error || 'Error updating group', { title: 'Could not save' });
-    }
+    await db.updateGroup({ id: currentGroup.id, password: editPassword, name, words });
+    await showAlert('Group updated!', { title: 'Saved' });
+    switchScreen('home');
+    loadGroups();
   } catch (err) {
     console.error('Error updating group:', err);
-    await showAlert('Error updating group', { title: 'Network error' });
+    await showAlert(friendlyError(err), { title: 'Could not save' });
   }
 }
 
@@ -427,22 +407,12 @@ async function deleteGroupPrompt(groupId) {
   if (password === null || password === '') return;
 
   try {
-    const response = await fetch(`${API_BASE}/groups/${groupId}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password })
-    });
-
-    if (response.ok) {
-      await showAlert('Group deleted.', { title: 'Done' });
-      loadGroups();
-    } else {
-      const error = await response.json().catch(() => ({}));
-      await showAlert(error.error || 'Error deleting group', { title: 'Could not delete' });
-    }
+    await db.deleteGroup({ id: groupId, password });
+    await showAlert('Group deleted.', { title: 'Done' });
+    loadGroups();
   } catch (err) {
     console.error('Error deleting group:', err);
-    await showAlert('Error deleting group', { title: 'Network error' });
+    await showAlert(friendlyError(err), { title: 'Could not delete' });
   }
 }
 
@@ -450,8 +420,11 @@ async function deleteGroupPrompt(groupId) {
 
 async function playGroup(groupId) {
   try {
-    const response = await fetch(`${API_BASE}/groups/${groupId}`);
-    currentGroup = await response.json();
+    currentGroup = await db.getGroup(groupId);
+    if (!currentGroup) {
+      await showAlert('Group not found.', { title: 'Oops' });
+      return;
+    }
 
     const words = currentGroup.words || [];
     if (words.length < 2) {
@@ -585,31 +558,19 @@ async function switchToEdit(groupId) {
   if (password === null || password === '') return;
 
   try {
-    const verifyRes = await fetch(`${API_BASE}/groups/${groupId}/verify-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password })
-    });
-
-    if (!verifyRes.ok) {
-      await showAlert('Could not verify password. Please try again.', { title: 'Oops' });
-      return;
-    }
-
-    const { valid } = await verifyRes.json();
+    const valid = await db.verifyPassword(groupId, password);
     if (!valid) {
       await showAlert('That password is not correct.', { title: 'Wrong password' });
       return;
     }
 
     editPassword = password;
-
-    const fullRes = await fetch(`${API_BASE}/groups/${groupId}`);
-    currentGroup = fullRes.ok ? await fullRes.json() : group;
+    const full = await db.getGroup(groupId);
+    currentGroup = full || group;
     currentScreen = 'edit';
     render();
   } catch (err) {
     console.error('Error unlocking group:', err);
-    await showAlert('Network error. Please try again.', { title: 'Oops' });
+    await showAlert(friendlyError(err), { title: 'Oops' });
   }
 }
