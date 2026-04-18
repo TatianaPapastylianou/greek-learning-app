@@ -127,6 +127,8 @@ button.secondary {
   transform: rotate(-1deg);
   transition: all 0.2s;
   position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
 }
 
 .group-card-delete {
