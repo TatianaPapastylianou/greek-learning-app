@@ -6,6 +6,7 @@ let groups = [];
 let currentGroup = null;
 let gameState = null;
 let selectedWord = null;
+let editPassword = null;
 
 // --- Helpers ---
 
@@ -17,6 +18,87 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// --- Styled modal dialogs ---
+
+function closeModal(modal) {
+  modal.classList.remove('active');
+  setTimeout(() => modal.remove(), 100);
+}
+
+function showAlert(message, { title = 'Notice', okLabel = 'OK' } = {}) {
+  return new Promise((resolve) => {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.innerHTML = `
+      <div class="modal-content" role="dialog" aria-modal="true">
+        <h3>${escapeHtml(title)}</h3>
+        <p>${escapeHtml(message)}</p>
+        <div class="modal-actions">
+          <button type="button" class="primary" data-ok>${escapeHtml(okLabel)}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const okBtn = modal.querySelector('[data-ok]');
+    const done = () => { closeModal(modal); resolve(); };
+    okBtn.addEventListener('click', done);
+    modal.addEventListener('click', (e) => { if (e.target === modal) done(); });
+    document.addEventListener('keydown', function onKey(e) {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        document.removeEventListener('keydown', onKey);
+        done();
+      }
+    });
+    setTimeout(() => okBtn.focus(), 20);
+  });
+}
+
+function showPrompt(message, {
+  title = 'Enter value',
+  placeholder = '',
+  type = 'text',
+  okLabel = 'OK',
+  cancelLabel = 'Cancel',
+  okClass = 'primary'
+} = {}) {
+  return new Promise((resolve) => {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.innerHTML = `
+      <div class="modal-content" role="dialog" aria-modal="true">
+        <h3>${escapeHtml(title)}</h3>
+        <p>${escapeHtml(message)}</p>
+        <input type="${escapeHtml(type)}" placeholder="${escapeHtml(placeholder)}" data-input>
+        <div class="modal-actions">
+          <button type="button" class="secondary" data-cancel>${escapeHtml(cancelLabel)}</button>
+          <button type="button" class="${escapeHtml(okClass)}" data-ok>${escapeHtml(okLabel)}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const input = modal.querySelector('[data-input]');
+    const okBtn = modal.querySelector('[data-ok]');
+    const cancelBtn = modal.querySelector('[data-cancel]');
+    const resolveWith = (val) => { closeModal(modal); resolve(val); };
+    okBtn.addEventListener('click', () => resolveWith(input.value));
+    cancelBtn.addEventListener('click', () => resolveWith(null));
+    modal.addEventListener('click', (e) => { if (e.target === modal) resolveWith(null); });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); resolveWith(input.value); }
+      else if (e.key === 'Escape') { resolveWith(null); }
+    });
+    setTimeout(() => input.focus(), 20);
+  });
 }
 
 function wordPairHtml(greek = '', english = '') {
@@ -140,7 +222,7 @@ function renderEditScreen() {
   if (!currentGroup) return '';
 
   const words = currentGroup.words || [];
-  const emptySlots = Math.max(0, 4 - words.length);
+  const emptySlots = Math.max(0, 2 - words.length);
 
   return `
     <div class="screen edit-screen active">
@@ -150,11 +232,6 @@ function renderEditScreen() {
         <div class="form-group">
           <label for="editGroupName">Group Name</label>
           <input type="text" id="editGroupName" value="${escapeHtml(currentGroup.name)}" required>
-        </div>
-
-        <div class="form-group">
-          <label for="editPassword">Password (to confirm changes)</label>
-          <input type="password" id="editPassword" placeholder="Enter group password" required>
         </div>
 
         <div class="form-group">
@@ -194,7 +271,6 @@ function renderGameScreen() {
 
       <div class="game-board">
         <div class="game-column">
-          <h3>Greek</h3>
           ${leftWords.map(item => `
             <div
               class="word-card ${item.matched ? 'matched' : ''} ${item.selected ? 'selected' : ''}"
@@ -208,7 +284,6 @@ function renderGameScreen() {
         </div>
 
         <div class="game-column">
-          <h3>English</h3>
           ${rightWords.map(item => `
             <div
               class="word-card ${item.matched ? 'matched' : ''} ${item.selected ? 'selected' : ''}"
@@ -241,7 +316,7 @@ async function loadGroups() {
     render();
   } catch (err) {
     console.error('Error loading groups:', err);
-    alert('Failed to load groups');
+    showAlert('Failed to load groups', { title: 'Oops' });
   }
 }
 
@@ -250,7 +325,7 @@ async function createGroup() {
   const password = document.getElementById('groupPassword').value;
 
   if (!name || !password) {
-    alert('Please fill in all fields');
+    await showAlert('Please fill in all fields', { title: 'Missing info' });
     return;
   }
 
@@ -268,7 +343,7 @@ async function createGroup() {
   }
 
   if (words.length < 2) {
-    alert('Please add at least 2 word pairs');
+    await showAlert('Please add at least 2 word pairs', { title: 'Not enough pairs' });
     return;
   }
 
@@ -280,27 +355,27 @@ async function createGroup() {
     });
 
     if (response.ok) {
-      alert('Group created!');
+      await showAlert('Group created!', { title: 'Done' });
       switchScreen('home');
       loadGroups();
     } else {
       const err = await response.json().catch(() => ({}));
-      alert('Could not create group: ' + (err.error || `HTTP ${response.status}`));
+      await showAlert(err.error || `HTTP ${response.status}`, { title: 'Could not create group' });
     }
   } catch (err) {
     console.error('Error creating group:', err);
-    alert('Could not reach the server. Is the backend running at ' + window.location.origin + '? Details: ' + err.message);
+    await showAlert('Could not reach the server. Details: ' + err.message, { title: 'Network error' });
   }
 }
 
 async function updateGroup() {
-  const password = document.getElementById('editPassword').value;
-  const name = document.getElementById('editGroupName').value;
-
-  if (!password) {
-    alert('Please enter the group password');
+  if (!editPassword) {
+    await showAlert('Session expired. Please try again.', { title: 'Oops' });
+    switchScreen('home');
     return;
   }
+
+  const name = document.getElementById('editGroupName').value;
 
   const greekInputs = document.querySelectorAll('.greek-word');
   const englishInputs = document.querySelectorAll('.english-word');
@@ -316,7 +391,7 @@ async function updateGroup() {
   }
 
   if (words.length < 2) {
-    alert('Please add at least 2 word pairs');
+    await showAlert('Please add at least 2 word pairs', { title: 'Not enough pairs' });
     return;
   }
 
@@ -324,26 +399,32 @@ async function updateGroup() {
     const response = await fetch(`${API_BASE}/groups/${currentGroup.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password, name, words })
+      body: JSON.stringify({ password: editPassword, name, words })
     });
 
     if (response.ok) {
-      alert('Group updated!');
+      await showAlert('Group updated!', { title: 'Saved' });
       switchScreen('home');
       loadGroups();
     } else {
-      const error = await response.json();
-      alert(error.error || 'Error updating group');
+      const error = await response.json().catch(() => ({}));
+      await showAlert(error.error || 'Error updating group', { title: 'Could not save' });
     }
   } catch (err) {
     console.error('Error updating group:', err);
-    alert('Error updating group');
+    await showAlert('Error updating group', { title: 'Network error' });
   }
 }
 
 async function deleteGroupPrompt(groupId) {
-  const password = prompt('Enter group password to delete:');
-  if (password === null) return;
+  const password = await showPrompt('Enter the group password to confirm deletion.', {
+    title: 'Delete group?',
+    placeholder: 'Group password',
+    type: 'password',
+    okLabel: 'Delete',
+    okClass: 'danger'
+  });
+  if (password === null || password === '') return;
 
   try {
     const response = await fetch(`${API_BASE}/groups/${groupId}`, {
@@ -353,15 +434,15 @@ async function deleteGroupPrompt(groupId) {
     });
 
     if (response.ok) {
-      alert('Group deleted!');
+      await showAlert('Group deleted.', { title: 'Done' });
       loadGroups();
     } else {
-      const error = await response.json();
-      alert(error.error || 'Error deleting group');
+      const error = await response.json().catch(() => ({}));
+      await showAlert(error.error || 'Error deleting group', { title: 'Could not delete' });
     }
   } catch (err) {
     console.error('Error deleting group:', err);
-    alert('Error deleting group');
+    await showAlert('Error deleting group', { title: 'Network error' });
   }
 }
 
@@ -374,34 +455,28 @@ async function playGroup(groupId) {
 
     const words = currentGroup.words || [];
     if (words.length < 2) {
-      alert('This group has no word pairs yet.');
+      await showAlert('This group has no word pairs yet.', { title: 'Nothing to play' });
       return;
     }
 
-    const leftWords = words.map((w, i) => ({
+    const leftWords = shuffle(words.map((w, i) => ({
       id: i,
       word: w.greek_word,
       matched: false,
       selected: false,
       correctMatch: i
-    }));
+    })));
 
-    const rightWordsShuffled = words.map((w, i) => ({
+    const rightWords = shuffle(words.map((w, i) => ({
       id: i,
       word: w.english_translation,
       matched: false,
       selected: false
-    }));
-
-    // Shuffle right words
-    for (let i = rightWordsShuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [rightWordsShuffled[i], rightWordsShuffled[j]] = [rightWordsShuffled[j], rightWordsShuffled[i]];
-    }
+    })));
 
     gameState = {
       leftColumn: leftWords,
-      rightColumn: rightWordsShuffled,
+      rightColumn: rightWords,
       matched: [],
       totalPairs: words.length
     };
@@ -411,7 +486,7 @@ async function playGroup(groupId) {
     render();
   } catch (err) {
     console.error('Error loading group:', err);
-    alert('Error loading group');
+    await showAlert('Error loading group', { title: 'Oops' });
   }
 }
 
@@ -481,31 +556,60 @@ function selectWord(side, id) {
   }
 }
 
-function gameComplete() {
-  alert('Congratulations! You completed the game! 🎉');
+async function gameComplete() {
+  await showAlert('You matched every pair!', { title: 'Well done!' });
   switchScreen('home');
 }
 
 // --- Navigation ---
 
 function switchScreen(screen) {
+  if (currentScreen === 'edit' && screen !== 'edit') {
+    editPassword = null;
+  }
   currentScreen = screen;
   selectedWord = null;
   render();
 }
 
-function switchToEdit(groupId) {
-  currentGroup = groups.find(g => g.id === groupId);
-  // The /api/groups list endpoint doesn't include words, so fetch the full group
-  fetch(`${API_BASE}/groups/${groupId}`)
-    .then(r => r.ok ? r.json() : null)
-    .then(full => {
-      if (full) currentGroup = full;
-      currentScreen = 'edit';
-      render();
-    })
-    .catch(() => {
-      currentScreen = 'edit';
-      render();
+async function switchToEdit(groupId) {
+  const group = groups.find(g => g.id === groupId);
+  if (!group) return;
+
+  const password = await showPrompt(`Enter the password for "${group.name}" to edit it.`, {
+    title: 'Password required',
+    placeholder: 'Group password',
+    type: 'password',
+    okLabel: 'Unlock'
+  });
+  if (password === null || password === '') return;
+
+  try {
+    const verifyRes = await fetch(`${API_BASE}/groups/${groupId}/verify-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
     });
+
+    if (!verifyRes.ok) {
+      await showAlert('Could not verify password. Please try again.', { title: 'Oops' });
+      return;
+    }
+
+    const { valid } = await verifyRes.json();
+    if (!valid) {
+      await showAlert('That password is not correct.', { title: 'Wrong password' });
+      return;
+    }
+
+    editPassword = password;
+
+    const fullRes = await fetch(`${API_BASE}/groups/${groupId}`);
+    currentGroup = fullRes.ok ? await fullRes.json() : group;
+    currentScreen = 'edit';
+    render();
+  } catch (err) {
+    console.error('Error unlocking group:', err);
+    await showAlert('Network error. Please try again.', { title: 'Oops' });
+  }
 }
