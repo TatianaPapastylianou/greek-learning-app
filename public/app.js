@@ -5,6 +5,10 @@ let currentGroup = null;
 let gameState = null;
 let selectedWord = null;
 let editPassword = null;
+let duplicateWords = null;
+let duplicateSourceName = null;
+
+const ROUND_SIZE = 6;
 
 // --- Helpers ---
 
@@ -171,6 +175,7 @@ function renderHomeScreen() {
             <div class="group-card-actions">
               <button onclick="playGroup(${Number(group.id)})" class="secondary">Play</button>
               <button onclick="switchToEdit(${Number(group.id)})">Edit</button>
+              <button onclick="duplicateGroup(${Number(group.id)})">Duplicate</button>
               <button onclick="deleteGroupPrompt(${Number(group.id)})" class="danger">Delete</button>
             </div>
           </div>
@@ -182,10 +187,16 @@ function renderHomeScreen() {
 
 // Create Screen
 function renderCreateScreen() {
+  const isDuplicate = Array.isArray(duplicateWords) && duplicateWords.length > 0;
+  const pairsHtml = isDuplicate
+    ? duplicateWords.map(w => wordPairHtml(w.greek_word, w.english_translation)).join('')
+    : [1, 2, 3, 4].map(() => wordPairHtml()).join('');
+
   return `
     <div class="screen create-screen active">
       <form onsubmit="event.preventDefault()">
-        <h2>Create New Group</h2>
+        <h2>${isDuplicate ? 'Duplicate Group' : 'Create New Group'}</h2>
+        ${isDuplicate ? `<p style="text-align: center; color: #666; margin-top: -10px; margin-bottom: 20px;">Copied words from "${escapeHtml(duplicateSourceName || '')}". Pick a new name and password.</p>` : ''}
 
         <div class="form-group">
           <label for="groupName">Group Name</label>
@@ -201,7 +212,7 @@ function renderCreateScreen() {
           <label>Words (Greek &rarr; English)</label>
           <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">Add as many word pairs as you like (minimum 2). Use the + button to add more.</p>
           <div class="word-inputs" id="wordInputs">
-            ${[1, 2, 3, 4].map(() => wordPairHtml()).join('')}
+            ${pairsHtml}
           </div>
           <button type="button" class="word-add-btn secondary" onclick="addWordPair()">＋ Add Word Pair</button>
         </div>
@@ -257,14 +268,21 @@ function renderGameScreen() {
 
   const leftWords = gameState.leftColumn;
   const rightWords = gameState.rightColumn;
-  const matchedCount = gameState.matched.length;
+  const roundMatchedCount = gameState.matched.length;
+  const roundPairs = gameState.roundPairs;
+  const overallMatched = gameState.totalMatched + roundMatchedCount;
   const totalPairs = gameState.totalPairs;
+  const totalRounds = gameState.rounds.length;
+  const currentRound = gameState.currentRoundIndex + 1;
+  const roundComplete = roundMatchedCount === roundPairs;
+  const isLastRound = gameState.currentRoundIndex === totalRounds - 1;
 
   return `
     <div class="screen game-screen active">
       <div class="game-header">
         <h2>${escapeHtml(currentGroup.name)}</h2>
-        <div class="game-progress">Matched: ${matchedCount} / ${totalPairs}</div>
+        ${totalRounds > 1 ? `<div class="game-round">Round ${currentRound} of ${totalRounds}</div>` : ''}
+        <div class="game-progress">Matched: ${overallMatched} / ${totalPairs}</div>
       </div>
 
       <div class="game-board">
@@ -296,7 +314,10 @@ function renderGameScreen() {
       </div>
 
       <div class="game-actions">
-        ${matchedCount === totalPairs ? `
+        ${roundComplete && !isLastRound ? `
+          <button onclick="nextRound()" class="primary">Next Round →</button>
+        ` : ''}
+        ${roundComplete && isLastRound ? `
           <button onclick="gameComplete()" class="primary">Game Complete! 🎉</button>
         ` : ''}
         <button onclick="switchScreen('home')" class="secondary">Quit Game</button>
@@ -396,6 +417,26 @@ async function updateGroup() {
   }
 }
 
+async function duplicateGroup(groupId) {
+  try {
+    const full = await db.getGroup(groupId);
+    if (!full) {
+      await showAlert('Group not found.', { title: 'Oops' });
+      return;
+    }
+    duplicateWords = (full.words || []).map(w => ({
+      greek_word: w.greek_word,
+      english_translation: w.english_translation
+    }));
+    duplicateSourceName = full.name;
+    currentScreen = 'create';
+    render();
+  } catch (err) {
+    console.error('Error duplicating group:', err);
+    await showAlert(friendlyError(err), { title: 'Could not duplicate' });
+  }
+}
+
 async function deleteGroupPrompt(groupId) {
   const password = await showPrompt('Enter the group password to confirm deletion.', {
     title: 'Delete group?',
@@ -432,35 +473,61 @@ async function playGroup(groupId) {
       return;
     }
 
-    const leftWords = shuffle(words.map((w, i) => ({
-      id: i,
-      word: w.greek_word,
-      matched: false,
-      selected: false,
-      correctMatch: i
-    })));
-
-    const rightWords = shuffle(words.map((w, i) => ({
-      id: i,
-      word: w.english_translation,
-      matched: false,
-      selected: false
-    })));
+    const shuffledWords = shuffle(words.slice());
+    const rounds = [];
+    for (let i = 0; i < shuffledWords.length; i += ROUND_SIZE) {
+      rounds.push(shuffledWords.slice(i, i + ROUND_SIZE));
+    }
 
     gameState = {
-      leftColumn: leftWords,
-      rightColumn: rightWords,
+      rounds,
+      currentRoundIndex: 0,
+      totalPairs: words.length,
+      totalMatched: 0,
+      leftColumn: [],
+      rightColumn: [],
       matched: [],
-      totalPairs: words.length
+      roundPairs: 0
     };
 
-    selectedWord = null;
+    startRound();
     currentScreen = 'game';
     render();
   } catch (err) {
     console.error('Error loading group:', err);
     await showAlert('Error loading group', { title: 'Oops' });
   }
+}
+
+function startRound() {
+  const roundWords = gameState.rounds[gameState.currentRoundIndex];
+
+  gameState.leftColumn = shuffle(roundWords.map((w, i) => ({
+    id: i,
+    word: w.greek_word,
+    matched: false,
+    selected: false,
+    correctMatch: i
+  })));
+
+  gameState.rightColumn = shuffle(roundWords.map((w, i) => ({
+    id: i,
+    word: w.english_translation,
+    matched: false,
+    selected: false
+  })));
+
+  gameState.matched = [];
+  gameState.roundPairs = roundWords.length;
+  selectedWord = null;
+}
+
+function nextRound() {
+  if (!gameState) return;
+  gameState.totalMatched += gameState.roundPairs;
+  gameState.currentRoundIndex++;
+  startRound();
+  render();
 }
 
 function selectWord(side, id) {
@@ -539,6 +606,10 @@ async function gameComplete() {
 function switchScreen(screen) {
   if (currentScreen === 'edit' && screen !== 'edit') {
     editPassword = null;
+  }
+  if (currentScreen === 'create' && screen !== 'create') {
+    duplicateWords = null;
+    duplicateSourceName = null;
   }
   currentScreen = screen;
   selectedWord = null;

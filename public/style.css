@@ -284,6 +284,13 @@ textarea:focus {
   word-wrap: break-word;
 }
 
+.game-round {
+  font-family: 'Caveat', 'Mynerve', cursive;
+  font-size: 1.4em;
+  color: #d32f2f;
+  margin-bottom: 6px;
+}
+
 .game-progress {
   font-size: 1.2em;
   color: #666;
