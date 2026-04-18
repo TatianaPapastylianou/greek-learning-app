@@ -5,7 +5,7 @@
 }
 
 body {
-  font-family: 'Indie Flower', cursive;
+  font-family: 'Indie Flower', 'Mynerve', cursive;
   background: linear-gradient(45deg, #fef9e7 0%, #fff9c4 100%);
   background-attachment: fixed;
   min-height: 100vh;
@@ -28,7 +28,7 @@ header {
 h1 {
   font-size: 3em;
   font-weight: 700;
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat', 'Mynerve', cursive;
   color: #d32f2f;
   text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
   transform: rotate(-2deg);
@@ -67,7 +67,7 @@ h1 {
 button {
   padding: 12px 30px;
   font-size: 1.1em;
-  font-family: 'Indie Flower', cursive;
+  font-family: 'Indie Flower', 'Mynerve', cursive;
   background: #fff;
   border: 3px solid #333;
   border-radius: 50px;
@@ -137,7 +137,7 @@ button.secondary {
   font-size: 1.5em;
   margin-bottom: 10px;
   color: #d32f2f;
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat', 'Mynerve', cursive;
   word-wrap: break-word;
 }
 
@@ -169,7 +169,7 @@ form {
 
 form h2 {
   font-size: 2em;
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat', 'Mynerve', cursive;
   color: #d32f2f;
   margin-bottom: 20px;
 }
@@ -191,7 +191,7 @@ input[type="password"],
 textarea {
   width: 100%;
   padding: 12px;
-  font-family: 'Indie Flower', cursive;
+  font-family: 'Indie Flower', 'Mynerve', cursive;
   font-size: 1em;
   border: 2px solid #333;
   border-radius: 10px;
@@ -278,7 +278,7 @@ textarea:focus {
 
 .game-header h2 {
   font-size: 2em;
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat', 'Mynerve', cursive;
   color: #d32f2f;
   margin-bottom: 10px;
   word-wrap: break-word;
@@ -305,7 +305,7 @@ textarea:focus {
 
 .game-column h3 {
   text-align: center;
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat', 'Mynerve', cursive;
   font-size: 1.3em;
   color: #333;
   margin-bottom: 10px;
@@ -406,7 +406,7 @@ textarea:focus {
 }
 
 .modal-content h3 {
-  font-family: 'Caveat', cursive;
+  font-family: 'Caveat', 'Mynerve', cursive;
   font-size: 1.8em;
   color: #d32f2f;
   margin-bottom: 15px;
@@ -421,7 +421,7 @@ textarea:focus {
   width: 100%;
   padding: 12px;
   margin-bottom: 20px;
-  font-family: 'Indie Flower', cursive;
+  font-family: 'Indie Flower', 'Mynerve', cursive;
   font-size: 1em;
   border: 2px solid #333;
   border-radius: 10px;
@@ -521,7 +521,7 @@ textarea:focus {
   margin: 60px auto 10px;
   padding: 18px 20px;
   text-align: center;
-  font-family: 'Indie Flower', cursive;
+  font-family: 'Indie Flower', 'Mynerve', cursive;
   font-size: 0.95em;
   color: #888;
   opacity: 0.7;

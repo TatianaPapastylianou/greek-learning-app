@@ -160,7 +160,7 @@ function renderHomeScreen() {
         <button onclick="switchScreen('create')" class="primary">Create New Group</button>
       </div>
 
-      <h2 style="text-align: center; font-family: 'Caveat', cursive; font-size: 2em; margin-bottom: 30px;">Available Groups</h2>
+      <h2 style="text-align: center; font-family: 'Caveat', 'Mynerve', cursive; font-size: 2em; margin-bottom: 30px;">Available Groups</h2>
 
       ${groups.length === 0 ? '<p class="empty-state">No groups yet. Create one to get started!</p>' : ''}
 
@@ -225,7 +225,7 @@ function renderEditScreen() {
   return `
     <div class="screen edit-screen active">
       <form onsubmit="event.preventDefault()">
-        <h2>Edit Group: ${escapeHtml(currentGroup.name)}</h2>
+        <h2>${escapeHtml(currentGroup.name)}</h2>
 
         <div class="form-group">
           <label for="editGroupName">Group Name</label>
