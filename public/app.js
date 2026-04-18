@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = '/api';
 
 // App state
 let currentScreen = 'home';
@@ -6,6 +6,41 @@ let groups = [];
 let currentGroup = null;
 let gameState = null;
 let selectedWord = null;
+
+// --- Helpers ---
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function wordPairHtml(greek = '', english = '') {
+  return `
+    <div class="word-input-pair">
+      <input type="text" class="greek-word" value="${escapeHtml(greek)}" placeholder="Greek word">
+      <input type="text" class="english-word" value="${escapeHtml(english)}" placeholder="English translation">
+      <button type="button" class="word-remove" aria-label="Remove pair" onclick="removeWordPair(this)">×</button>
+    </div>
+  `;
+}
+
+function addWordPair() {
+  const container = document.getElementById('wordInputs');
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', wordPairHtml());
+  const inputs = container.querySelectorAll('.greek-word');
+  inputs[inputs.length - 1].focus();
+}
+
+function removeWordPair(btn) {
+  const row = btn.closest('.word-input-pair');
+  if (row) row.remove();
+}
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Render function
 function render() {
   const app = document.getElementById('app');
-  
+
   let html = `
     <header>
       <h1>Greek Word Matcher</h1>
@@ -35,7 +70,6 @@ function render() {
   }
 
   app.innerHTML = html;
-  attachEventListeners();
 }
 
 // Home Screen
@@ -45,19 +79,19 @@ function renderHomeScreen() {
       <div class="button-group">
         <button onclick="switchScreen('create')" class="primary">Create New Group</button>
       </div>
-      
+
       <h2 style="text-align: center; font-family: 'Caveat', cursive; font-size: 2em; margin-bottom: 30px;">Available Groups</h2>
-      
+
       ${groups.length === 0 ? '<p class="empty-state">No groups yet. Create one to get started!</p>' : ''}
-      
+
       <div class="groups-list">
         ${groups.map(group => `
           <div class="group-card">
-            <h3>${group.name}</h3>
+            <h3>${escapeHtml(group.name)}</h3>
             <div class="group-card-actions">
-              <button onclick="playGroup(${group.id})" class="secondary">Play</button>
-              <button onclick="switchToEdit(${group.id})">Edit</button>
-              <button onclick="deleteGroupPrompt(${group.id})" class="danger">Delete</button>
+              <button onclick="playGroup(${Number(group.id)})" class="secondary">Play</button>
+              <button onclick="switchToEdit(${Number(group.id)})">Edit</button>
+              <button onclick="deleteGroupPrompt(${Number(group.id)})" class="danger">Delete</button>
             </div>
           </div>
         `).join('')}
@@ -70,9 +104,9 @@ function renderHomeScreen() {
 function renderCreateScreen() {
   return `
     <div class="screen create-screen active">
-      <form>
+      <form onsubmit="event.preventDefault()">
         <h2>Create New Group</h2>
-        
+
         <div class="form-group">
           <label for="groupName">Group Name</label>
           <input type="text" id="groupName" placeholder="e.g., Food Vocabulary" required>
@@ -84,16 +118,12 @@ function renderCreateScreen() {
         </div>
 
         <div class="form-group">
-          <label>Words (Greek → English)</label>
-          <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">Add 4 words for the matching game</p>
-          <div class="word-inputs">
-            ${[1, 2, 3, 4].map(i => `
-              <div class="word-input-pair">
-                <input type="text" class="greek-word" placeholder="Greek word" required>
-                <input type="text" class="english-word" placeholder="English translation" required>
-              </div>
-            `).join('')}
+          <label>Words (Greek &rarr; English)</label>
+          <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">Add as many word pairs as you like (minimum 2). Use the + button to add more.</p>
+          <div class="word-inputs" id="wordInputs">
+            ${[1, 2, 3, 4].map(() => wordPairHtml()).join('')}
           </div>
+          <button type="button" class="word-add-btn secondary" onclick="addWordPair()">＋ Add Word Pair</button>
         </div>
 
         <div class="form-actions">
@@ -108,15 +138,18 @@ function renderCreateScreen() {
 // Edit Screen
 function renderEditScreen() {
   if (!currentGroup) return '';
-  
+
+  const words = currentGroup.words || [];
+  const emptySlots = Math.max(0, 4 - words.length);
+
   return `
     <div class="screen edit-screen active">
-      <form>
-        <h2>Edit Group: ${currentGroup.name}</h2>
-        
+      <form onsubmit="event.preventDefault()">
+        <h2>Edit Group: ${escapeHtml(currentGroup.name)}</h2>
+
         <div class="form-group">
           <label for="editGroupName">Group Name</label>
-          <input type="text" id="editGroupName" value="${currentGroup.name}" required>
+          <input type="text" id="editGroupName" value="${escapeHtml(currentGroup.name)}" required>
         </div>
 
         <div class="form-group">
@@ -125,21 +158,13 @@ function renderEditScreen() {
         </div>
 
         <div class="form-group">
-          <label>Words (Greek → English)</label>
-          <div class="word-inputs">
-            ${(currentGroup.words || []).map((word, i) => `
-              <div class="word-input-pair">
-                <input type="text" class="greek-word" value="${word.greek_word}" required>
-                <input type="text" class="english-word" value="${word.english_translation}" required>
-              </div>
-            `).join('')}
-            ${[currentGroup.words.length, currentGroup.words.length + 1, currentGroup.words.length + 2, currentGroup.words.length + 3].slice(0, 4 - currentGroup.words.length).map(i => `
-              <div class="word-input-pair">
-                <input type="text" class="greek-word" placeholder="Greek word">
-                <input type="text" class="english-word" placeholder="English translation">
-              </div>
-            `).join('')}
+          <label>Words (Greek &rarr; English)</label>
+          <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">Add, edit, or remove pairs. Minimum 2.</p>
+          <div class="word-inputs" id="wordInputs">
+            ${words.map(word => wordPairHtml(word.greek_word, word.english_translation)).join('')}
+            ${Array.from({ length: emptySlots }).map(() => wordPairHtml()).join('')}
           </div>
+          <button type="button" class="word-add-btn secondary" onclick="addWordPair()">＋ Add Word Pair</button>
         </div>
 
         <div class="form-actions">
@@ -163,7 +188,7 @@ function renderGameScreen() {
   return `
     <div class="screen game-screen active">
       <div class="game-header">
-        <h2>${currentGroup.name}</h2>
+        <h2>${escapeHtml(currentGroup.name)}</h2>
         <div class="game-progress">Matched: ${matchedCount} / ${totalPairs}</div>
       </div>
 
@@ -171,13 +196,13 @@ function renderGameScreen() {
         <div class="game-column">
           <h3>Greek</h3>
           ${leftWords.map(item => `
-            <div 
+            <div
               class="word-card ${item.matched ? 'matched' : ''} ${item.selected ? 'selected' : ''}"
-              onclick="selectWord('left', ${item.id})"
-              data-id="${item.id}"
+              onclick="selectWord('left', ${Number(item.id)})"
+              data-id="${Number(item.id)}"
               data-side="left"
             >
-              ${item.word}
+              ${escapeHtml(item.word)}
             </div>
           `).join('')}
         </div>
@@ -185,13 +210,13 @@ function renderGameScreen() {
         <div class="game-column">
           <h3>English</h3>
           ${rightWords.map(item => `
-            <div 
+            <div
               class="word-card ${item.matched ? 'matched' : ''} ${item.selected ? 'selected' : ''}"
-              onclick="selectWord('right', ${item.id})"
-              data-id="${item.id}"
+              onclick="selectWord('right', ${Number(item.id)})"
+              data-id="${Number(item.id)}"
               data-side="right"
             >
-              ${item.word}
+              ${escapeHtml(item.word)}
             </div>
           `).join('')}
         </div>
@@ -207,7 +232,7 @@ function renderGameScreen() {
   `;
 }
 
-// API Functions
+// --- API Functions ---
 
 async function loadGroups() {
   try {
@@ -259,11 +284,12 @@ async function createGroup() {
       switchScreen('home');
       loadGroups();
     } else {
-      alert('Error creating group');
+      const err = await response.json().catch(() => ({}));
+      alert('Could not create group: ' + (err.error || `HTTP ${response.status}`));
     }
   } catch (err) {
     console.error('Error creating group:', err);
-    alert('Error creating group');
+    alert('Could not reach the server. Is the backend running at ' + window.location.origin + '? Details: ' + err.message);
   }
 }
 
@@ -339,15 +365,19 @@ async function deleteGroupPrompt(groupId) {
   }
 }
 
-// Game Functions
+// --- Game Functions ---
 
 async function playGroup(groupId) {
   try {
     const response = await fetch(`${API_BASE}/groups/${groupId}`);
     currentGroup = await response.json();
 
-    // Initialize game
-    const words = currentGroup.words;
+    const words = currentGroup.words || [];
+    if (words.length < 2) {
+      alert('This group has no word pairs yet.');
+      return;
+    }
+
     const leftWords = words.map((w, i) => ({
       id: i,
       word: w.greek_word,
@@ -393,7 +423,7 @@ function selectWord(side, id) {
 
   if (!card || card.matched) return;
 
-  // If nothing selected, select this
+  // Nothing selected yet → select this card
   if (!selectedWord) {
     card.selected = true;
     selectedWord = { side, id };
@@ -401,48 +431,54 @@ function selectWord(side, id) {
     return;
   }
 
-  // If same side selected, deselect
+  // Same side clicked → deselect the previously-selected card on this side
   if (selectedWord.side === side) {
-    card.selected = false;
-    selectedWord = null;
+    const prevCard = column.find(c => c.id === selectedWord.id);
+    if (prevCard) prevCard.selected = false;
+    if (selectedWord.id === id) {
+      selectedWord = null;
+    } else {
+      card.selected = true;
+      selectedWord = { side, id };
+    }
     render();
     return;
   }
 
-  // Different side - check if match
-  const leftCard = selectedWord.side === 'left' 
+  // Different sides → evaluate match
+  const leftCard = selectedWord.side === 'left'
     ? gameState.leftColumn.find(c => c.id === selectedWord.id)
-    : column.find(c => c.id === id);
-  
+    : card;
   const rightCard = selectedWord.side === 'right'
     ? gameState.rightColumn.find(c => c.id === selectedWord.id)
-    : column.find(c => c.id === id);
+    : card;
 
-  // Check if it's a correct match
   if (leftCard.correctMatch === rightCard.id) {
     // Match found
     leftCard.matched = true;
     rightCard.matched = true;
+    leftCard.selected = false;
+    rightCard.selected = false;
     gameState.matched.push({ left: leftCard.id, right: rightCard.id });
     selectedWord = null;
-  } else {
-    // Wrong match - flash and reset
-    leftCard.selected = false;
-    card.selected = false;
-    selectedWord = null;
-    
-    // Add wrong animation class
     render();
-    const cards = document.querySelectorAll('.word-card');
-    cards.forEach(c => c.classList.add('wrong'));
-    
-    setTimeout(() => {
-      render();
-    }, 300);
-    return;
-  }
+  } else {
+    // Wrong match — shake only the two involved cards
+    leftCard.selected = false;
+    rightCard.selected = false;
+    selectedWord = null;
+    render();
 
-  render();
+    const leftEl = document.querySelector(`.word-card[data-side="left"][data-id="${leftCard.id}"]`);
+    const rightEl = document.querySelector(`.word-card[data-side="right"][data-id="${rightCard.id}"]`);
+    leftEl && leftEl.classList.add('wrong');
+    rightEl && rightEl.classList.add('wrong');
+
+    setTimeout(() => {
+      leftEl && leftEl.classList.remove('wrong');
+      rightEl && rightEl.classList.remove('wrong');
+    }, 500);
+  }
 }
 
 function gameComplete() {
@@ -450,7 +486,7 @@ function gameComplete() {
   switchScreen('home');
 }
 
-// Navigation
+// --- Navigation ---
 
 function switchScreen(screen) {
   currentScreen = screen;
@@ -460,11 +496,16 @@ function switchScreen(screen) {
 
 function switchToEdit(groupId) {
   currentGroup = groups.find(g => g.id === groupId);
-  currentScreen = 'edit';
-  render();
-}
-
-// Event listeners (called after render)
-function attachEventListeners() {
-  // Event listeners are handled via onclick attributes in HTML
+  // The /api/groups list endpoint doesn't include words, so fetch the full group
+  fetch(`${API_BASE}/groups/${groupId}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(full => {
+      if (full) currentGroup = full;
+      currentScreen = 'edit';
+      render();
+    })
+    .catch(() => {
+      currentScreen = 'edit';
+      render();
+    });
 }

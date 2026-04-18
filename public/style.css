@@ -86,6 +86,11 @@ button:active {
   box-shadow: 2px 2px 0px rgba(0,0,0,0.1);
 }
 
+button:focus-visible {
+  outline: 3px solid rgba(211, 47, 47, 0.4);
+  outline-offset: 2px;
+}
+
 button.primary {
   background: #4caf50;
   color: white;
@@ -132,6 +137,7 @@ button.secondary {
   margin-bottom: 10px;
   color: #d32f2f;
   font-family: 'Caveat', cursive;
+  word-wrap: break-word;
 }
 
 .group-card-actions {
@@ -200,13 +206,52 @@ textarea:focus {
 }
 
 .word-inputs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .word-input-pair {
-  display: contents;
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.word-remove {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 1.5em;
+  line-height: 1;
+  border-radius: 50%;
+  background: #fff;
+  color: #666;
+  border: 2px solid #999;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.08);
+  transform: rotate(0deg);
+  flex-shrink: 0;
+}
+
+.word-remove:hover {
+  background: #f44336;
+  color: #fff;
+  border-color: #d32f2f;
+  transform: rotate(0deg) scale(1.1);
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.15);
+}
+
+.word-remove:active {
+  transform: rotate(0deg) scale(0.95);
+}
+
+.word-add-btn {
+  margin-top: 15px;
+  padding: 10px 24px;
+  font-size: 1em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .form-actions {
@@ -235,6 +280,7 @@ textarea:focus {
   font-family: 'Caveat', cursive;
   color: #d32f2f;
   margin-bottom: 10px;
+  word-wrap: break-word;
 }
 
 .game-progress {
@@ -280,6 +326,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   justify-content: center;
+  word-break: break-word;
 }
 
 .word-card:hover:not(.matched) {
@@ -302,14 +349,17 @@ textarea:focus {
 }
 
 .word-card.wrong {
-  animation: shake 0.3s;
+  animation: shake 0.35s;
   background: #ffcdd2;
+  border-color: #d32f2f;
 }
 
 @keyframes shake {
   0%, 100% { transform: translate(0, 0) rotate(-1deg); }
-  25% { transform: translate(-5px, 0) rotate(-1deg); }
-  75% { transform: translate(5px, 0) rotate(-1deg); }
+  20% { transform: translate(-6px, 0) rotate(-1deg); }
+  40% { transform: translate(6px, 0) rotate(-1deg); }
+  60% { transform: translate(-4px, 0) rotate(-1deg); }
+  80% { transform: translate(4px, 0) rotate(-1deg); }
 }
 
 .game-actions {
@@ -336,6 +386,7 @@ textarea:focus {
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  padding: 20px;
 }
 
 .modal.active {
@@ -348,7 +399,8 @@ textarea:focus {
   border: 3px solid #333;
   border-radius: 20px;
   box-shadow: 10px 10px 0px rgba(0,0,0,0.2);
-  max-width: 400px;
+  max-width: 420px;
+  width: 100%;
   transform: rotate(0.5deg);
 }
 
@@ -356,6 +408,11 @@ textarea:focus {
   font-family: 'Caveat', cursive;
   font-size: 1.8em;
   color: #d32f2f;
+  margin-bottom: 15px;
+}
+
+.modal-content p {
+  color: #555;
   margin-bottom: 20px;
 }
 
@@ -367,6 +424,7 @@ textarea:focus {
   font-size: 1em;
   border: 2px solid #333;
   border-radius: 10px;
+  background: #fffacd;
 }
 
 .modal-actions {
@@ -376,6 +434,14 @@ textarea:focus {
 
 .modal-actions button {
   flex: 1;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  font-size: 1.2em;
+  color: #666;
 }
 
 /* Responsive */
@@ -393,8 +459,26 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
-  .word-inputs {
-    grid-template-columns: 1fr;
+  .word-input-pair {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 8px 10px;
+  }
+
+  .word-input-pair .greek-word {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .word-input-pair .english-word {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .word-input-pair .word-remove {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    align-self: center;
   }
 
   .button-group {
@@ -406,10 +490,13 @@ textarea:focus {
   }
 }
 
-/* Empty state */
-.empty-state {
-  text-align: center;
-  padding: 40px;
-  font-size: 1.2em;
-  color: #666;
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  h1, button, .group-card, form, .word-card, .modal-content {
+    transform: none !important;
+  }
 }
